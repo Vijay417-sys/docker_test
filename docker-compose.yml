@@ -1,42 +1,37 @@
+name: product-service
 
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: product_mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-product_db}
-      MYSQL_USER: ${SPRING_DATASOURCE_USERNAME:?Set database username}
-      MYSQL_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?Set database password}
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - 'mysqladmin ping -h 127.0.0.1 -uroot -p"$${MYSQL_ROOT_PASSWORD}" --silent'
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-
-  product-service:
-    image: product_service:latest
+  app:
     build:
       context: .
       dockerfile: Dockerfile
+    image: product-service:${IMAGE_TAG:-latest}
     container_name: product_service
-    restart: unless-stopped
-    depends_on:
-      mysql:
-        condition: service_healthy
     ports:
       - "8087:8087"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-product_db}
-      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
-      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
-      SERVER_PORT: 8087
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:mysql://mysql:3306/product_db}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-product_user}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?Set SPRING_DATASOURCE_PASSWORD in .env or the environment}
+      SERVER_PORT: "8087"
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.4
+    profiles: ["local"]
+    container_name: product_mysql
+    environment:
+      MYSQL_DATABASE: product_db
+      MYSQL_USER: ${SPRING_DATASOURCE_USERNAME:-product_user}
+      MYSQL_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?Set SPRING_DATASOURCE_PASSWORD in .env or the environment}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-localrootpassword}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
 
 volumes:
   mysql_data:
